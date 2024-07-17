@@ -57,7 +57,7 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Dashboard</title>
+    <title>Sales Report</title>
     <?php include 'template/header.php'; ?>
 </head>
 <body>

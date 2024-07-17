@@ -1,5 +1,5 @@
 <?php
-require_once '../../config.php';
+require_once __DIR__ . '/../../config.php';
 
 function getRandomElement($array) {
     return $array[array_rand($array)];
@@ -23,8 +23,12 @@ for ($i = 0; $i < 20; $i++) {
     $stock = rand(1, 10);
 
     $sql = "INSERT INTO motorcycles (model, brand, price, warna, stock, created_at) VALUES (?, ?, ?, ?, ?, current_timestamp())";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ssisi", $model, $brand, $price, $color, $stock);
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindParam(1, $model);
+    $stmt->bindParam(2, $brand);
+    $stmt->bindParam(3, $price);
+    $stmt->bindParam(4, $color);
+    $stmt->bindParam(5, $stock);
     $stmt->execute();
 }
 

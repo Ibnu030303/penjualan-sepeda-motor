@@ -1,5 +1,5 @@
 <?php
-require_once '../../config.php';
+require_once __DIR__ . '/../../config.php';
 
 function getRandomElement($array) {
     return $array[array_rand($array)];
@@ -34,8 +34,9 @@ $names = [
 
 // Fetch existing emails to avoid duplicates
 $existingEmails = [];
-$result = $conn->query("SELECT email FROM customers");
-while ($row = $result->fetch_assoc()) {
+$sql = "SELECT email FROM customers";
+$stmt = $pdo->query($sql);
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $existingEmails[] = $row['email'];
 }
 
@@ -50,13 +51,13 @@ for ($i = 0; $i < 20; $i++) {
     $kk = 'kk_' . $i . '.jpg';
 
     $sql = "INSERT INTO customers (nik, no_kk, name, email, phone, address, ktp, kk, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, current_timestamp())";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ssssssss", $nik, $no_kk, $name, $email, $phone, $address, $ktp, $kk);
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$nik, $no_kk, $name, $email, $phone, $address, $ktp, $kk]);
 
-    if ($stmt->execute()) {
+    if ($stmt->rowCount() > 0) {
         $existingEmails[] = $email; // Add to the list of existing emails
     } else {
-        echo "Error: " . $stmt->error . "<br>";
+        echo "Error: " . $stmt->errorInfo()[2] . "<br>";
     }
 }
 

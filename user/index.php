@@ -1,13 +1,49 @@
 <?php
 session_start();
 
-// Check if the user is logged in and has the admin role
+// Check if the user is logged in and has the sales role
 if (!isset($_SESSION['username']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 'sales') {
-    header("Location: ../login.php"); // Redirect to login page if not logged in or not admin
-    exit();
+  header("Location: ../login.php"); // Redirect to login page if not logged in or not sales
+  exit();
 }
 
+require_once '../config.php';
+
 $username = $_SESSION['username'];
+
+// Fetch total sales and total orders for the logged-in sales user
+$sql_sales = "SELECT SUM(total_price) AS total_sales, COUNT(sale_id) AS total_orders
+              FROM sale s
+              JOIN users u ON s.user_id = u.user_id
+              WHERE u.username = ?";
+$stmt_sales = $conn->prepare($sql_sales);
+$stmt_sales->bind_param("s", $username);
+$stmt_sales->execute();
+$result_sales = $stmt_sales->get_result();
+
+if ($result_sales->num_rows > 0) {
+  $row_sales = $result_sales->fetch_assoc();
+  $total_sales = $row_sales['total_sales'];
+  $total_orders = $row_sales['total_orders'];
+} else {
+  $total_sales = 0;
+  $total_orders = 0;
+}
+
+$stmt_sales->close();
+
+// Fetch total number of customers
+$sql_customers = "SELECT COUNT(customer_id) AS total_customers FROM customers";
+$result_customers = $conn->query($sql_customers);
+
+if ($result_customers->num_rows > 0) {
+  $row_customers = $result_customers->fetch_assoc();
+  $total_customers = $row_customers['total_customers'];
+} else {
+  $total_customers = 0;
+}
+
+$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -17,25 +53,15 @@ $username = $_SESSION['username'];
   <meta charset="UTF-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin Dashboard</title>
-
-  <!-- Bootstrap -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha2/dist/css/bootstrap.min.css" />
-  <!-- Lni Icons -->
-  <link href="https://cdn.lineicons.com/4.0/lineicons.css" rel="stylesheet" />
-  <!-- Style -->
-  <link rel="stylesheet" href="assets/css/style.css" />
+  <title>Sales Dashboard</title>
+  <?php include 'template/header.php'; ?>
 </head>
 
 <body>
   <div class="wrapper">
-    <?php  include 'template/sidebar.php' ?>
+    <?php include 'template/sidebar.php' ?>
     <main id="main" class="main">
-        <nav class="navbar navbar-expand border-bottom">
-            <button class="btn" id="sidebar-toggle" type="button">
-            <i class="lni lni-menu navbar-toggler-icon"></i>
-            </button>
-        </nav>
+      <?php include 'template/nav.php'; ?>
 
       <div class="pagetitle">
         <h1>Dashboard</h1>
@@ -57,16 +83,14 @@ $username = $_SESSION['username'];
               <div class="col-xxl-4 col-md-4">
                 <div class="card info-card sales-card">
                   <div class="card-body">
-                    <h5 class="card-title">Sales</h5>
+                    <h5 class="card-title">Total Sales</h5>
 
                     <div class="d-flex align-items-center">
                       <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                         <i class="lni lni-cart"></i>
                       </div>
                       <div class="ps-3">
-                        <h6>145</h6>
-                        <span class="text-success small pt-1 fw-bold">12%</span>
-                        <span class="text-muted small pt-2 ps-1">increase</span>
+                        <h6><?php echo number_format($total_sales, 2); ?></h6>
                       </div>
                     </div>
                   </div>
@@ -78,15 +102,13 @@ $username = $_SESSION['username'];
               <div class="col-xxl-4 col-md-4">
                 <div class="card info-card revenue-card">
                   <div class="card-body">
-                    <h5 class="card-title">Revenue</h5>
+                    <h5 class="card-title">Total Orders</h5>
                     <div class="d-flex align-items-center">
                       <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                         <i class="lni lni-dollar"></i>
                       </div>
                       <div class="ps-3">
-                        <h6>$3,264</h6>
-                        <span class="text-success small pt-1 fw-bold">8%</span>
-                        <span class="text-muted small pt-2 ps-1">increase</span>
+                        <h6><?php echo $total_orders; ?></h6>
                       </div>
                     </div>
                   </div>
@@ -104,9 +126,7 @@ $username = $_SESSION['username'];
                         <i class="lni lni-users"></i>
                       </div>
                       <div class="ps-3">
-                        <h6>1244</h6>
-                        <span class="text-danger small pt-1 fw-bold">12%</span>
-                        <span class="text-muted small pt-2 ps-1">decrease</span>
+                        <h6><?php echo $total_customers; ?></h6>
                       </div>
                     </div>
                   </div>
@@ -137,11 +157,14 @@ $username = $_SESSION['username'];
     <!-- End #main -->
   </div>
 
-  <!-- Bootstrap -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha2/dist/js/bootstrap.bundle.min.js"></script>
+  <?php include 'template/footer.php'; ?>
 
-  <!-- Script -->
-  <script src="script.js"></script>
+  <script>
+    const sidebarToggle = document.querySelector("#sidebar-toggle");
+    sidebarToggle.addEventListener("click", function() {
+      document.querySelector("#sidebar").classList.toggle("collapsed");
+    });
+  </script>
 </body>
 
 </html>

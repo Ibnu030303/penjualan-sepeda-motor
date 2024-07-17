@@ -1,75 +1,70 @@
 <?php
 session_start();
+ob_start(); // Start output buffering
 
-// Check if the user is logged in and is an admin
-if (!isset($_SESSION['username']) || $_SESSION['role'] != 'admin') {
-    header("Location: login.php");
+// Check if the user is logged in and has the admin role
+if (!isset($_SESSION['username']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+    header("Location: ../login.php");
     exit();
 }
 
 require_once '../config.php';
 
-// Handle form submission for filtering sales reports
-$whereClauses = [];
-$params = [];
-$types = '';
+$username = $_SESSION['username'];
+$start_date = isset($_POST['start_date']) ? $_POST['start_date'] : '2000-01-01';
+$end_date = isset($_POST['end_date']) ? $_POST['end_date'] : date('Y-m-d');
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (!empty($_POST['start_date'])) {
-        $whereClauses[] = 'sale_date >= ?';
-        $params[] = $_POST['start_date'];
-        $types .= 's';
-    }
-    if (!empty($_POST['end_date'])) {
-        $whereClauses[] = 'sale_date <= ?';
-        $params[] = $_POST['end_date'];
-        $types .= 's';
-    }
+// Fetch total sales and total orders
+$sql_sales = "SELECT SUM(total_price) AS total_sales, COUNT(sale_id) AS total_orders
+              FROM sale
+              WHERE sale_date BETWEEN ? AND ?";
+$stmt_sales = $conn->prepare($sql_sales);
+$stmt_sales->bind_param("ss", $start_date, $end_date);
+$stmt_sales->execute();
+$result_sales = $stmt_sales->get_result();
+
+$total_sales = 0;
+$total_orders = 0;
+
+if ($result_sales->num_rows > 0) {
+    $row_sales = $result_sales->fetch_assoc();
+    $total_sales = $row_sales['total_sales'] ?? 0;
+    $total_orders = $row_sales['total_orders'] ?? 0;
 }
 
-$whereSql = '';
-if (count($whereClauses) > 0) {
-    $whereSql = 'WHERE ' . implode(' AND ', $whereClauses);
-}
+$stmt_sales->close();
 
-$sql = "SELECT sales.sale_id, customers.name AS customer_name, motorcycles.model AS motorcycle_model, sales.sale_date, sales.total_price, sales.payment_status 
-        FROM sales 
-        JOIN customers ON sales.customer_id = customers.customer_id 
-        JOIN motorcycles ON sales.motorcycle_id = motorcycles.motorcycle_id 
-        $whereSql 
-        ORDER BY sales.sale_date DESC";
+// Fetch total number of customers
+$sql_customers = "SELECT COUNT(customer_id) AS total_customers FROM customers";
+$result_customers = $conn->query($sql_customers);
+$total_customers = $result_customers->fetch_assoc()['total_customers'] ?? 0;
 
-$stmt = $conn->prepare($sql);
-if ($types) {
-    $stmt->bind_param($types, ...$params);
-}
-$stmt->execute();
-$result = $stmt->get_result();
+// Fetch detailed sales data
+$sql_sales_details = "SELECT s.sale_id, c.name AS customer_name, m.model AS motorcycle_model, s.sale_date, s.total_price, s.payment_type
+                      FROM sale s
+                      JOIN customers c ON s.customer_id = c.customer_id
+                      JOIN motorcycles m ON s.motorcycle_id = m.motorcycle_id
+                      WHERE s.sale_date BETWEEN ? AND ?";
+$stmt_sales_details = $conn->prepare($sql_sales_details);
+$stmt_sales_details->bind_param("ss", $start_date, $end_date);
+$stmt_sales_details->execute();
+$result_sales_details = $stmt_sales_details->get_result();
+$conn->close();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Reports</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    <!-- Lni Icons -->
-    <link href="https://cdn.lineicons.com/4.0/lineicons.css" rel="stylesheet" />
-    <!-- Style -->
-    <link rel="stylesheet" href="assets/css/style.css" />
+    <title>Sales Dashboard</title>
+    <?php include 'template/header.php'; ?>
 </head>
-
 <body>
     <div class="wrapper">
-        <?php include 'template/sidebar.php' ?>
+        <?php include 'template/sidebar.php'; ?>
         <main id="main" class="main">
-            <nav class="navbar navbar-expand border-bottom">
-                <button class="btn" id="sidebar-toggle" type="button">
-                    <i class="lni lni-menu navbar-toggler-icon"></i>
-                </button>
-            </nav>
+            <?php include 'template/nav.php'; ?>
 
             <div class="pagetitle">
                 <h1>Dashboard</h1>
@@ -80,76 +75,121 @@ $result = $stmt->get_result();
                     </ol>
                 </nav>
             </div>
-            <!-- End Page Title -->
 
             <section class="section dashboard">
                 <div class="row">
-                    <!-- Left side columns -->
                     <div class="col-lg-12">
                         <div class="row">
-                            <div class="card">
-
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-center">
-
-                                        <h5 class="card-title">Reports</h5>
+                            <div class="reports d-flex justify-content-center gap-4">
+                                <div class="col-xxl-4 col-md-4">
+                                    <div class="card info-card sales-card">
+                                        <div class="card-body">
+                                            <h5 class="card-title">Total Sales</h5>
+                                            <div class="d-flex align-items-center">
+                                                <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                                    <i class="lni lni-cart"></i>
+                                                </div>
+                                                <div class="ps-3">
+                                                    <h6><?php echo number_format($total_sales, 2); ?></h6>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
+                                </div>
 
-                                    <form method="POST" action="sales_reports.php" class="row g-3 mb-4">
+                                <div class="col-xxl-4 col-md-4">
+                                    <div class="card info-card revenue-card">
+                                        <div class="card-body">
+                                            <h5 class="card-title">Total Orders</h5>
+                                            <div class="d-flex align-items-center">
+                                                <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
+                                                    <i class="lni lni-dollar"></i>
+                                                </div>
+                                                <div class="ps-3">
+                                                    <h6><?php echo $total_orders; ?></h6>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card shadow-lg">
+                                <div class="card-body">
+                                    <h5 class="card-title">Sales Reports</h5>
+                                    <form method="POST" action="" class="row g-3 mb-4">
                                         <div class="col-md-3">
                                             <label for="start_date" class="form-label">Start Date</label>
-                                            <input type="date" class="form-control" name="start_date" id="start_date" value="<?php echo htmlspecialchars($_POST['start_date'] ?? ''); ?>">
+                                            <input type="date" class="form-control" name="start_date" id="start_date" value="<?php echo $start_date; ?>">
                                         </div>
                                         <div class="col-md-3">
                                             <label for="end_date" class="form-label">End Date</label>
-                                            <input type="date" class="form-control" name="end_date" id="end_date" value="<?php echo htmlspecialchars($_POST['end_date'] ?? ''); ?>">
+                                            <input type="date" class="form-control" name="end_date" id="end_date" value="<?php echo $end_date; ?>">
                                         </div>
                                         <div class="col-md-3 align-self-end">
                                             <button type="submit" class="btn btn-primary">Filter</button>
+                                            <button type="submit" formaction="report_sale.php" target="_blank" class="btn btn-primary">Cetak</button>
                                         </div>
                                     </form>
 
-
-                                    <table class="table table-bordered">
-                                        <thead>
-                                            <tr>
-                                                <th>Sale ID</th>
-                                                <th>Customer Name</th>
-                                                <th>Motorcycle Model</th>
-                                                <th>Sale Date</th>
-                                                <th>Total Price</th>
-                                                <th>Payment Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php while ($row = $result->fetch_assoc()) : ?>
+                                    <div class="overflow-x-auto">
+                                        <table class="table table-bordered display" id="salesTable">
+                                            <thead>
                                                 <tr>
-                                                    <td><?php echo $row['sale_id']; ?></td>
-                                                    <td><?php echo $row['customer_name']; ?></td>
-                                                    <td><?php echo $row['motorcycle_model']; ?></td>
-                                                    <td><?php echo $row['sale_date']; ?></td>
-                                                    <td><?php echo $row['total_price']; ?></td>
-                                                    <td><?php echo $row['payment_status']; ?></td>
+                                                    <th>NO</th>
+                                                    <th>Sale ID</th>
+                                                    <th>Customer Name</th>
+                                                    <th>Motorcycle Model</th>
+                                                    <th>Sale Date</th>
+                                                    <th>Total Price</th>
+                                                    <th>Payment Type</th>
                                                 </tr>
-                                            <?php endwhile; ?>
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody>
+                                                <?php $no = 1; ?>
+                                                <?php while ($row = $result_sales_details->fetch_assoc()) : ?>
+                                                    <tr>
+                                                        <td class="text-center"><?php echo $no++; ?></td>
+                                                        <td><?php echo htmlspecialchars($row['sale_id']); ?></td>
+                                                        <td><?php echo htmlspecialchars($row['customer_name']); ?></td>
+                                                        <td><?php echo htmlspecialchars($row['motorcycle_model']); ?></td>
+                                                        <td><?php echo htmlspecialchars($row['sale_date']); ?></td>
+                                                        <td class="price"><?php echo htmlspecialchars($row['total_price']); ?></td>
+                                                        <td><?php echo htmlspecialchars($row['payment_type']); ?></td>
+                                                    </tr>
+                                                <?php endwhile; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <!-- End Left side columns -->
                 </div>
             </section>
-
         </main>
-        <!-- End #main -->
+    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <?php include 'template/footer.php'; ?>
+
+    <script>
+        $('#salesTable').DataTable();
+        const sidebarToggle = document.querySelector("#sidebar-toggle");
+        sidebarToggle.addEventListener("click", function() {
+            document.querySelector("#sidebar").classList.toggle("collapsed");
+        });
+
+        // Format prices in IDR
+        const priceFormatter = new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0
+        });
+
+        document.querySelectorAll('.price').forEach(function(cell) {
+            const price = parseFloat(cell.textContent.replace(/[^0-9.-]+/g, ""));
+            cell.textContent = priceFormatter.format(price);
+        });
+    </script>
 </body>
-
 </html>
-<?php
-$stmt->close();
-$conn->close();
-?>

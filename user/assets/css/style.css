@@ -142,16 +142,6 @@ a.sidebar-link:hover {
   color: #012970;
 }
 
-/* .navbar {
-  box-shadow: 0px 0 30px rgba(1, 41, 112, 0.1);
-  background: transparent;
-} */
-
-.avatar {
-  height: 40px;
-  width: 40px;
-}
-
 .navbar-expand .navbar-nav {
   margin-left: auto;
 }
@@ -239,4 +229,10 @@ a.sidebar-link:hover {
 .dashboard .customers-card .card-icon {
   color: #ff771d;
   background: #ffecdf;
+}
+
+@media screen and (max-width: 768px) {
+  .dashboard .repots {
+    flex-direction: column;
+  }
 }

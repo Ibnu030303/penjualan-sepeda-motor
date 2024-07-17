@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config.php';
 
-function up($pdo) {
+function up_users($pdo) {
     $sql = "CREATE TABLE IF NOT EXISTS users (
         user_id INT(11) AUTO_INCREMENT PRIMARY KEY,
         nama CHAR(50) COLLATE utf8mb4_general_ci NOT NULL,
@@ -19,7 +19,7 @@ function up($pdo) {
     }
 }
 
-function down($pdo) {
+function down_users($pdo) {
     $sql = "DROP TABLE IF EXISTS users;";
     
     try {

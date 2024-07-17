@@ -1,14 +1,21 @@
 <?php
-
-$host = 'localhost';
-$db = 'penjualan';
+$host = 'viaduct.proxy.rlwy.net';
+$db = 'railway';
 $user = 'root';
-$pass = '';
+$pass = 'NffllskjJyRdpUivsWrLvenIvRQdLYYs';
+$charset = 'utf8mb4';
 
-$conn = new mysqli($host, $user, $pass, $db);
+$dsn = "mysql:host=$host;port=31143;dbname=$db;charset=$charset";
+$options = [
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
+];
 
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+try {
+    $pdo = new PDO($dsn, $user, $pass, $options);
+    echo "Connection successful!\n";
+} catch (PDOException $e) {
+    echo "Connection failed: " . $e->getMessage() . "\n";
 }
-
 ?>

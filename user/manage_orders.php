@@ -19,34 +19,45 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $user_id = $_SESSION['user_id']; // Assuming user_id is stored in session when user logs in
 
     // Fetch the price of the selected motorcycle
-    $sql_price = "SELECT price FROM motorcycles WHERE motorcycle_id=?";
+    $sql_price = "SELECT price, stock FROM motorcycles WHERE motorcycle_id=?";
     $stmt_price = $conn->prepare($sql_price);
     $stmt_price->bind_param("i", $motorcycle_id);
     $stmt_price->execute();
-    $stmt_price->bind_result($motorcycle_price);
+    $stmt_price->bind_result($motorcycle_price, $motorcycle_stock);
     $stmt_price->fetch();
     $stmt_price->close();
 
-    $total_price = $motorcycle_price; // Set total price to motorcycle price
+    if ($motorcycle_stock > 0) {
+        $total_price = $motorcycle_price; // Set total price to motorcycle price
 
-    if ($sale_id) {
-        // Update existing sale
-        $sql = "UPDATE sale SET customer_id=?, motorcycle_id=?, sale_date=?, total_price=?, payment_type=?, user_id=? WHERE sale_id=?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("iisssii", $customer_id, $motorcycle_id, $sale_date, $total_price, $payment_type, $user_id, $sale_id);
-    } else {
-        // Add new sale
-        $sql = "INSERT INTO sale (customer_id, motorcycle_id, sale_date, total_price, payment_type, user_id) VALUES (?, ?, ?, ?, ?, ?)";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("iisssi", $customer_id, $motorcycle_id, $sale_date, $total_price, $payment_type, $user_id);
-    }
+        if ($sale_id) {
+            // Update existing sale
+            $sql = "UPDATE sale SET customer_id=?, motorcycle_id=?, sale_date=?, total_price=?, payment_type=?, user_id=? WHERE sale_id=?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("iisssii", $customer_id, $motorcycle_id, $sale_date, $total_price, $payment_type, $user_id, $sale_id);
+        } else {
+            // Add new sale
+            $sql = "INSERT INTO sale (customer_id, motorcycle_id, sale_date, total_price, payment_type, user_id) VALUES (?, ?, ?, ?, ?, ?)";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("iisssi", $customer_id, $motorcycle_id, $sale_date, $total_price, $payment_type, $user_id);
 
-    if ($stmt->execute()) {
-        $_SESSION['success_message'] = "Sale saved successfully.";
-        header("Location: manage_orders.php");
-        exit();
+            // Update motorcycle stock
+            $sql_stock = "UPDATE motorcycles SET stock = stock - 1 WHERE motorcycle_id=?";
+            $stmt_stock = $conn->prepare($sql_stock);
+            $stmt_stock->bind_param("i", $motorcycle_id);
+            $stmt_stock->execute();
+            $stmt_stock->close();
+        }
+
+        if ($stmt->execute()) {
+            $_SESSION['success_message'] = "Sale saved successfully.";
+            header("Location: manage_orders.php");
+            exit();
+        } else {
+            $_SESSION['error_message'] = "Error saving sale: " . $stmt->error;
+        }
     } else {
-        $_SESSION['error_message'] = "Error saving sale: " . $stmt->error;
+        $_SESSION['error_message'] = "Error: The motorcycle is out of stock.";
     }
 }
 
@@ -251,7 +262,6 @@ if (!$result) {
             sidebarToggle.addEventListener("click", function() {
                 document.querySelector("#sidebar").classList.toggle("collapsed");
             });
-
 
             $('#saleTable').DataTable();
 
